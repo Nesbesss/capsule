@@ -8,8 +8,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var audioRecorder: AudioRecorder?
     var transcriptionEngine: TranscriptionEngine?
     var textPaster: TextPaster?
-    var settingsHub: SettingsHub?
-    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize AppState on Main Thread
         appState = AppState()
@@ -26,9 +24,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         floatingWindow = FloatingPillWindow(appState: appState)
         floatingWindow?.makeKeyAndOrderFront(nil)
         
-        // Set up settings hub
-        settingsHub = SettingsHub(appState: appState)
-        
         // Listen for v2 events
         NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchModel"), object: nil, queue: .main) { [weak self] note in
             if let modelName = note.object as? String {
@@ -37,8 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: .main) { [weak self] _ in
-            self?.settingsHub?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            self?.openNativeSettings()
         }
         
         // Set up keyboard monitoring
@@ -111,6 +105,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                 let secondsSaved = Double(wordCount) / 2.5
                                 self.appState.totalSecondsSaved += secondsSaved
                                 
+                                // Persist to shared config for React UI
+                                self.appState.saveToConfig()
+                                
                                 self.textPaster?.paste(text: text)
                             }
                             self.appState.mode = .idle
@@ -124,6 +121,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+    
+    private var settingsWindow: SettingsHub?
+    
+    private func openNativeSettings() {
+        print("🚀 Opening Native Settings Hub...")
+        
+        if settingsWindow == nil {
+            settingsWindow = SettingsHub(appState: appState)
+        }
+        
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        settingsWindow?.center()
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     func applicationWillTerminate(_ notification: Notification) {

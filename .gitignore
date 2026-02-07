@@ -7,3 +7,4 @@ deploy.sh
 package_dmg.sh
 *.bin
 models/
+capsule-tauri/

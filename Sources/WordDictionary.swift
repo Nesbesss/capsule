@@ -4,7 +4,7 @@ class WordDictionary {
     static let shared = WordDictionary()
     private let storageKey = "com.nesbes.capsule.wordDictionary"
     
-    private(set) var mappings: [String: String] = [:] {
+    var mappings: [String: String] = [:] {
         didSet {
             save()
         }
