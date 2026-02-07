@@ -5,24 +5,32 @@ class TranscriptionEngine {
     private var whisperKit: WhisperKit?
     private var isInitialized = false
     
-    init() {
+    init(modelName: String) {
         Task {
-            await initializeWhisper()
+            await initializeWhisper(modelName: modelName)
         }
     }
     
-    private func initializeWhisper() async {
+    private func initializeWhisper(modelName: String) async {
+        await MainActor.run { isInitialized = false }
         do {
-            // Initialize WhisperKit with base.en model for better accuracy while maintaining speed
+            print("🧠 Loading Whisper model: \(modelName)...")
             whisperKit = try await WhisperKit(
-                model: "base.en",
+                model: modelName,
                 verbose: false,
                 logLevel: .none
             )
-            isInitialized = true
-            print("🧠 Whisper model loaded (base.en)")
+            await MainActor.run { isInitialized = true }
+            print("✨ Whisper model loaded: \(modelName)")
         } catch {
-            print("⚠️ Failed to initialize Whisper: \(error)")
+            print("❌ Failed to initialize Whisper: \(error)")
+            await MainActor.run { isInitialized = true } // Release wait even on error
+        }
+    }
+    
+    func switchModel(to modelName: String) {
+        Task {
+            await initializeWhisper(modelName: modelName)
         }
     }
     

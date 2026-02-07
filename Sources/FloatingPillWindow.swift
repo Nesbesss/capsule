@@ -54,6 +54,7 @@ class FloatingPillWindow: NSPanel {
         setupClickGesture()
         setupTrackingArea()
         setupMenu()
+        setupContextMenu()
         
         // Set initial state
         updateUI(for: appState.mode)
@@ -88,17 +89,34 @@ class FloatingPillWindow: NSPanel {
         
         // Status Label
         statusLabel.frame = NSRect(x: 48, y: (size.height - 20) / 2, width: 85, height: 20)
-        statusLabel.font = .systemFont(ofSize: 12, weight: .semibold) // Slightly bolder for professionalism
+        statusLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         statusLabel.textColor = .white
         statusLabel.alphaValue = 0
         containerView.addSubview(statusLabel)
         
-        // Waveform (Increased padding from logo)
+        // Waveform
         waveformView.frame = NSRect(x: 48, y: 0, width: 85, height: size.height)
         waveformView.alphaValue = 0
         containerView.addSubview(waveformView)
         
         self.contentView = containerView
+    }
+    
+    private func setupContextMenu() {
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Quit Capsule", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        containerView.menu = menu
+    }
+    
+    @objc private func openSettings() {
+        NotificationCenter.default.post(name: NSNotification.Name("OpenSettings"), object: nil)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard let menu = containerView.menu else { return }
+        NSMenu.popUpContextMenu(menu, with: event, for: containerView)
     }
     
     private func setupTrackingArea() {
@@ -119,10 +137,6 @@ class FloatingPillWindow: NSPanel {
         historyItem.target = self
         dropdownMenu.addItem(historyItem)
         
-        let dictItem = NSMenuItem(title: "Dictionary", action: #selector(showDictionary), keyEquivalent: "")
-        dictItem.target = self
-        dropdownMenu.addItem(dictItem)
-        
         dropdownMenu.addItem(NSMenuItem.separator())
         
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
@@ -130,38 +144,9 @@ class FloatingPillWindow: NSPanel {
         dropdownMenu.addItem(quitItem)
     }
     
-    override func mouseEntered(with event: NSEvent) {
-        // Show indicator or change background to signal hover
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            containerView.animator().layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
-        }
-    }
-    
-    override func mouseExited(with event: NSEvent) {
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            containerView.animator().layer?.backgroundColor = NSColor.black.withAlphaComponent(0.4).cgColor
-        }
-    }
-    
     @objc private func showHistory() {
-        let historyAlert = NSAlert()
-        historyAlert.messageText = "Recent Transcriptions"
-        let historyText = appState.history.isEmpty ? "No history yet" : appState.history.joined(separator: "\n\n")
-        historyAlert.informativeText = historyText
-        historyAlert.addButton(withTitle: "Close")
-        historyAlert.runModal()
-    }
-    
-    @objc private func showDictionary() {
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            if appDelegate.dictionaryWindow == nil {
-                appDelegate.dictionaryWindow = DictionaryWindow(appState: appState)
-            }
-            appDelegate.dictionaryWindow?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        NotificationCenter.default.post(name: NSNotification.Name("OpenSettings"), object: nil)
+        // Redirection to the new v2 Settings Hub
     }
     
     @objc private func quitApp() {
@@ -176,43 +161,6 @@ class FloatingPillWindow: NSPanel {
     @objc private func pillClicked() {
         let location = NSPoint(x: 0, y: containerView.bounds.height)
         dropdownMenu.popUp(positioning: nil, at: location, in: containerView)
-    }
-    
-    private func showAddWordDialog() {
-        let alert = NSAlert()
-        alert.messageText = "Add Custom Word Mapping"
-        alert.informativeText = "Example: 'open claw' -> 'openclaw'"
-        alert.addButton(withTitle: "Add")
-        alert.addButton(withTitle: "Cancel")
-        
-        let stackView = NSStackView(frame: NSRect(x: 0, y: 0, width: 200, height: 60))
-        stackView.orientation = .vertical
-        stackView.spacing = 8
-        
-        let fromField = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        fromField.placeholderString = "Spoken phrase (e.g. open claw)"
-        
-        let toField = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        toField.placeholderString = "Replacement (e.g. openclaw)"
-        
-        stackView.addArrangedSubview(fromField)
-        stackView.addArrangedSubview(toField)
-        
-        alert.accessoryView = stackView
-        
-        alert.beginSheetModal(for: self) { response in
-            if response == .alertFirstButtonReturn {
-                let from = fromField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                let to = toField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                if !from.isEmpty && !to.isEmpty {
-                    WordDictionary.shared.addMapping(from: from, to: to)
-                    Task { @MainActor in
-                        self.appState.dictionary = WordDictionary.shared.mappings
-                    }
-                }
-            }
-        }
     }
     
     private func setupBindings() {
@@ -268,7 +216,6 @@ class FloatingPillWindow: NSPanel {
                 containerView.layer?.borderColor = NSColor.systemOrange.withAlphaComponent(0.5).cgColor
             }
             
-            // Expand/Contract the window frame
             let screenFrame = NSScreen.main?.visibleFrame ?? .zero
             let currentFrame = self.frame
             let newFrame = NSRect(
@@ -279,6 +226,20 @@ class FloatingPillWindow: NSPanel {
             )
             
             self.animator().setFrame(newFrame, display: true)
+        }
+    }
+    
+    override func mouseEntered(with event: NSEvent) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            containerView.animator().layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
+        }
+    }
+    
+    override func mouseExited(with event: NSEvent) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            containerView.animator().layer?.backgroundColor = NSColor.black.withAlphaComponent(0.4).cgColor
         }
     }
 }

@@ -8,7 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var audioRecorder: AudioRecorder?
     var transcriptionEngine: TranscriptionEngine?
     var textPaster: TextPaster?
-    var dictionaryWindow: DictionaryWindow?
+    var settingsHub: SettingsHub?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize AppState on Main Thread
@@ -19,12 +19,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Initialize components
         audioRecorder = AudioRecorder()
-        transcriptionEngine = TranscriptionEngine()
+        transcriptionEngine = TranscriptionEngine(modelName: appState.selectedModel)
         textPaster = TextPaster()
         
         // Create floating window
         floatingWindow = FloatingPillWindow(appState: appState)
         floatingWindow?.makeKeyAndOrderFront(nil)
+        
+        // Set up settings hub
+        settingsHub = SettingsHub(appState: appState)
+        
+        // Listen for v2 events
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchModel"), object: nil, queue: .main) { [weak self] note in
+            if let modelName = note.object as? String {
+                self?.transcriptionEngine?.switchModel(to: modelName)
+            }
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: .main) { [weak self] _ in
+            self?.settingsHub?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
         
         // Set up keyboard monitoring
         keyboardMonitor = KeyboardMonitor(
@@ -82,10 +97,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         await MainActor.run {
                             if !text.isEmpty {
                                 self.appState.lastTranscription = text
+                                
+                                // Update History
                                 self.appState.history.insert(text, at: 0)
-                                if self.appState.history.count > 10 {
+                                if self.appState.history.count > 50 { // Increased for v2
                                     self.appState.history.removeLast()
                                 }
+                                
+                                // Update Analytics
+                                self.appState.totalTranscriptions += 1
+                                // Estimate: 150 words per minute, roughly 1 second saved per 2.5 words transcribed
+                                let wordCount = text.split(separator: " ").count
+                                let secondsSaved = Double(wordCount) / 2.5
+                                self.appState.totalSecondsSaved += secondsSaved
+                                
                                 self.textPaster?.paste(text: text)
                             }
                             self.appState.mode = .idle
