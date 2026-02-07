@@ -16,3 +16,11 @@ Minimalist speech-to-text for macOS.
 ### Usage
 - **Hold Right Option**: Record.
 - **Release Right Option**: Paste.
+
+### Troubleshooting
+**If it doesn't paste:**
+Run this command in Terminal to reset accessibility permissions:
+```bash
+tccutil reset Accessibility com.nesbes.capsule
+```
+Then restart the app and grant permissions again.
