@@ -7,6 +7,11 @@ Minimalist speech-to-text for macOS.
 ### Installation
 1. Download `Capsule.dmg`.
 2. Move to Applications.
+3. Open the app (Right-click -> Open if macOS blocks it).
+
+### Permissions
+1. **Microphone**: Allow when prompted.
+2. **Accessibility**: Grant in `System Settings > Privacy & Security > Accessibility`. (This is required for the "Paste" feature to work).
 
 ### Usage
 - **Hold Right Option**: Record.
